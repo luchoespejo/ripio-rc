@@ -1,0 +1,2 @@
+Poly Haven (CC0): fir_sapling -> fir.glb, rock_09 -> rock1.glb, rock_07 -> rock2.glb, shrub_03 -> shrub.glb, fern_02 -> fern.glb
+Bajados de polígonos con tools/slim-glb.mjs. Originales: https://polyhaven.com/a/<id>

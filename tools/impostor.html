@@ -1,0 +1,24 @@
+<!doctype html><meta charset="utf-8"><title>impostor</title>
+<script type="module">
+// Fotografía un modelo 3D de árbol de costado, con fondo transparente, para usarlo como sprite (billboard). Uso: window.shoot('fir_sapling', 512)
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+window.shoot = async (id, px = 512, which = -1) => {
+  const gltf = await new GLTFLoader().loadAsync(`/_tmp_trees/${id}/${id}.gltf`);
+  const root = gltf.scene, kids = root.children.filter(c => c.type !== 'Light');
+  if (which >= 0 && kids.length > 1) kids.forEach((k, i) => { k.visible = i === which; }); // varios árboles en un archivo: se fotografía de a uno
+  root.updateMatrixWorld(true);
+  const box = new THREE.Box3(); root.traverse(o => { const m = o; if (m.isMesh && m.visible && (!m.parent || m.parent.visible)) { let v = true, p = m; while (p) { if (!p.visible) v = false; p = p.parent; } if (v) box.expandByObject(m); } });
+  const size = box.getSize(new THREE.Vector3()), ctr = box.getCenter(new THREE.Vector3());
+  const r = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+  const h = size.y * 1.04, w = Math.max(size.x, size.z) * 1.1, asp = Math.min(3, Math.max(0.3, w / h)); r.setSize(Math.round(px * asp), px); r.setClearColor(0x000000, 0);
+  r.outputColorSpace = THREE.SRGBColorSpace;
+  const sc = new THREE.Scene(); sc.add(root);
+  sc.add(new THREE.HemisphereLight(0xffffff, 0x8a8a70, 2.2)); const d = new THREE.DirectionalLight(0xfff2dd, 1.8); d.position.set(2, 3, 4); sc.add(d);
+  const cam = new THREE.OrthographicCamera(-h * asp / 2, h * asp / 2, ctr.y + h / 2, ctr.y - h / 2, 0.1, 500);
+  cam.position.set(ctr.x, ctr.y, ctr.z + 100); cam.lookAt(ctr);
+  r.render(sc, cam);
+  return { n: kids.length, png: r.domElement.toDataURL('image/png'), w: r.domElement.width, h: r.domElement.height, size: [size.x, size.y, size.z] };
+};
+window.ready = true;
+</script>

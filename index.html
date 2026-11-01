@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Ripio RC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Barlow:wght@400;600&display=swap">
+<style>
+/* Layout: canvas a pantalla completa; HUD tipo cronómetro de rally arriba, pedales táctiles abajo. Look único (exterior soleado), sin tema claro/oscuro. */
+:root{
+  --sky:#a9cbe6;
+  --panel:rgba(18,20,24,.74);
+  --panel-solid:#16181c;
+  --text:#f3efe4;
+  --muted:#b7b1a2;
+  --hazard:#f4c21b;
+  --cone:#e3352b;
+  --gate:#2f74e0;
+  --line:rgba(255,255,255,.14);
+  --display:'Chakra Petch', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  --body:'Barlow', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color-scheme:dark;
+}
+[hidden]{display:none!important}
+html,body{height:100%;overflow:hidden;touch-action:none;overscroll-behavior:none}
+body{background:var(--sky);color:var(--text);font-family:var(--body);
+  padding-block:0;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));
+  -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--hazard);outline-offset:2px}
+
+#hud{position:fixed;top:calc(10px + env(safe-area-inset-top, 0px));left:calc(10px + env(safe-area-inset-left, 0px));
+  background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 12px;display:grid;
+  grid-template-columns:auto auto;gap:2px 14px;pointer-events:none;font-family:var(--display);backdrop-filter:blur(6px)}
+#hud .k{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);align-self:center}
+#hud .v{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;text-align:right}
+#hud .v.run{color:var(--hazard)}
+#hud .stripe{grid-column:1/-1;height:4px;margin:2px 0 4px;border-radius:1px;
+  background:repeating-linear-gradient(-45deg,var(--hazard) 0 6px,#111 6px 12px)}
+
+#menu{position:fixed;top:calc(10px + env(safe-area-inset-top, 0px));right:calc(10px + env(safe-area-inset-right, 0px));display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;max-width:60vw}
+.mbtn{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:7px 11px;font-family:var(--display);font-size:13px;font-weight:500;letter-spacing:.03em;backdrop-filter:blur(6px)}
+.mbtn:hover{border-color:var(--hazard)}
+
+#tune{position:fixed;top:calc(56px + env(safe-area-inset-top, 0px));right:calc(10px + env(safe-area-inset-right, 0px));
+  width:min(290px, calc(100vw - 32px));background:var(--panel-solid);border:1px solid var(--line);border-radius:8px;padding:14px;display:grid;gap:12px;z-index:5}
+#tune h2{margin:0;font-family:var(--display);font-size:14px;letter-spacing:.06em;text-transform:uppercase}
+#tune p{margin:0;color:var(--muted);font-size:13px;line-height:1.4}
+.row{display:grid;gap:4px}
+.row label{display:flex;justify-content:space-between;font-size:13px}
+.row output{font-family:var(--display);font-variant-numeric:tabular-nums;color:var(--hazard)}
+.row input[type=range]{width:100%;accent-color:var(--hazard)}
+select{background:var(--panel-solid);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:5px;font:inherit}
+.chk{display:flex;gap:8px;align-items:center;font-size:13px}
+.tbtns{display:flex;gap:8px;flex-wrap:wrap}
+.tbtns button{background:transparent;border:1px solid var(--line);border-radius:6px;padding:6px 10px;font-size:13px}
+
+#toast{position:fixed;left:50%;top:28%;transform:translate(-50%,-50%);font-family:var(--display);font-weight:700;font-size:clamp(22px,6vw,40px);
+  color:var(--text);text-shadow:0 2px 0 #000,0 0 18px rgba(0,0,0,.5);pointer-events:none;opacity:0;transition:opacity .25s;white-space:nowrap}
+#toast.on{opacity:1}
+#hint{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom, 0px));background:var(--panel);border:1px solid var(--line);
+  border-radius:6px;padding:6px 12px;font-size:13px;color:var(--muted);white-space:nowrap;pointer-events:none}
+#hint b{color:var(--text);font-family:var(--display);font-weight:500}
+
+#steerZone{position:fixed;left:0;top:0;bottom:0;width:55%;touch-action:none}
+#steerBase,#steerKnob{position:absolute;border-radius:50%;pointer-events:none;transform:translate(-50%,-50%)}
+#steerBase{width:150px;height:46px;border-radius:23px;background:rgba(18,20,24,.35);border:1px solid rgba(255,255,255,.25)}
+#steerKnob{width:46px;height:46px;background:rgba(244,194,27,.85);box-shadow:0 2px 8px rgba(0,0,0,.4)}
+#steerHelp{position:absolute;left:calc(16px + env(safe-area-inset-left, 0px));bottom:calc(24px + env(safe-area-inset-bottom, 0px));font-size:13px;color:var(--text);
+  background:var(--panel);padding:6px 10px;border-radius:6px;pointer-events:none}
+#pedals{position:fixed;right:calc(14px + env(safe-area-inset-right, 0px));bottom:calc(18px + env(safe-area-inset-bottom, 0px));
+  display:flex;gap:14px;align-items:flex-end;touch-action:none}
+/* barra de acelerador: arriba = gas, línea del medio = soltar, abajo = freno. Si soltás el dedo en la zona de gas, queda donde la dejaste. */
+#thr{position:relative;width:96px;height:min(60vh,340px);border-radius:48px;overflow:hidden;touch-action:none;background:rgba(18,20,24,.5);border:2px solid rgba(255,255,255,.35)}
+#thrFill{position:absolute;left:0;right:0;pointer-events:none}
+#thrFill.gas{background:rgba(244,194,27,.55)} #thrFill.brk{background:rgba(214,60,50,.6)}
+#thrNeutral{position:absolute;left:8px;right:8px;height:2px;background:rgba(255,255,255,.55);pointer-events:none}
+#thrKnob{position:absolute;left:50%;width:62px;height:62px;margin:-31px 0 0 -31px;border-radius:50%;background:rgba(255,255,255,.92);box-shadow:0 2px 8px rgba(0,0,0,.5);pointer-events:none;display:grid;place-items:center;font:700 13px var(--display);color:#111}
+.thrLbl{position:absolute;left:0;right:0;text-align:center;font:700 12px var(--display);letter-spacing:.06em;color:rgba(255,255,255,.75);pointer-events:none}
+.ped{border-radius:50%;border:2px solid rgba(255,255,255,.35);font-family:var(--display);font-weight:700;letter-spacing:.04em;touch-action:none;
+  background:rgba(18,20,24,.55);display:grid;place-items:center}
+.ped.on{background:rgba(244,194,27,.9);color:#111;border-color:var(--hazard)}
+body.arcade #thr{display:none}
+#bBrake{width:96px;height:96px;font-size:15px;display:none} body.arcade #bBrake{display:grid}
+#bHand{width:84px;height:84px;font-size:14px}
+
+#intro{position:fixed;inset:0;display:grid;place-items:center;padding:calc(16px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  background:linear-gradient(180deg,rgba(10,12,14,.15),rgba(10,12,14,.6));z-index:10;overflow:auto}
+.card{background:var(--panel-solid);border:1px solid var(--line);border-radius:10px;max-width:480px;width:100%;padding:20px 22px;display:grid;gap:14px}
+.card h1{margin:0;font-family:var(--display);font-weight:700;font-size:clamp(34px,9vw,52px);line-height:1;letter-spacing:.01em}
+.card h1 span{color:var(--hazard)}
+.card .tag{margin:0;color:var(--muted);line-height:1.45;font-size:15px}
+.card .stripe{height:6px;border-radius:2px;background:repeating-linear-gradient(-45deg,var(--hazard) 0 8px,#111 8px 16px)}
+.tests{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.tests li{display:grid;grid-template-columns:14px 1fr;gap:10px;align-items:start;font-size:14px;line-height:1.4}
+.dot{width:12px;height:12px;border-radius:50%;margin-top:4px}
+.ctrls{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;font-size:13px;color:var(--muted);line-height:1.5}
+.ctrls h3{margin:0 0 2px;font-family:var(--display);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--text)}
+kbd{font-family:var(--display);font-size:12px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;color:var(--text)}
+#play{background:var(--hazard);color:#111;border:0;border-radius:8px;padding:12px;font-family:var(--display);font-weight:700;font-size:18px;letter-spacing:.06em}
+#play:hover{filter:brightness(1.06)}
+@media (max-width:520px){ #hud .v{font-size:14px} .mbtn{padding:6px 9px;font-size:12px} }
+</style>
+
+</head><body>
+<canvas id="c" aria-label="Escena del juego"></canvas>
+
+<div id="hud" aria-live="off">
+  <span class="k">Slalom</span><span class="v" id="hTime">—</span>
+  <span class="k">Mejor</span><span class="v" id="hBest">—</span>
+  <div class="stripe"></div>
+  <span class="k">Conos</span><span class="v" id="hCones">0</span>
+  <span class="k">Trompos</span><span class="v" id="hDonuts">0</span>
+  <span class="k">km/h</span><span class="v" id="hSpeed">0</span>
+</div>
+
+<div id="menu">
+  <button class="mbtn" id="bCam" type="button">Cámara: seguir</button>
+  <button class="mbtn" id="bReplay" type="button">Repetición</button>
+  <button class="mbtn" id="bTune" type="button">Ajustes</button>
+  <button class="mbtn" id="bMute" type="button">Sonido: sí</button>
+  <button class="mbtn" id="bReset" type="button">Reiniciar</button>
+</div>
+
+<div id="tune" hidden>
+  <h2>Manejo</h2>
+  <p>Probá distintos valores: el objetivo es encontrar el punto donde derrapar se siente bien.</p>
+  <div class="row"><label for="sPower">Potencia <output id="oPower"></output></label><input id="sPower" type="range" min="4" max="30" step="0.5"></div>
+  <div class="row"><label for="sGrip">Agarre al ripio <output id="oGrip"></output></label><input id="sGrip" type="range" min="0.3" max="3" step="0.05"></div>
+  <div class="row"><label for="sRear">Agarre trasero <output id="oRear"></output></label><input id="sRear" type="range" min="0.4" max="1.2" step="0.02"></div>
+  <div class="row"><label for="sSteer">Dirección <output id="oSteer"></output></label><input id="sSteer" type="range" min="0.2" max="0.8" step="0.02"></div>
+  <div class="row"><label for="sTrack">Pista</label><select id="sTrack"></select></div>
+  <div class="row" style="font-size:11px;opacity:.6"><span>Trazados: TUMFTM/racetrack-database (LGPL-3.0) · Texturas y cielo: Poly Haven (CC0) · Autos: jsa201077 (CC BY 4.0) · Motor: qubodup, Freesound (CC BY 4.0)</span></div>
+  <div class="row"><label for="sCar">Auto</label><select id="sCar"></select></div>
+  <div class="row"><label for="sScale">Escala del auto</label><select id="sScale"><option value="10">1:10 (RC)</option><option value="5">1:5</option><option value="2.5">1:2.5</option><option value="1">1:1 (real)</option></select></div>
+  <div class="row"><label>Estilo de manejo</label><div class="tbtns" id="presets"><button type="button" data-p="arcade">Arcade</button><button type="button" data-p="rally">Rally</button><button type="button" data-p="equilibrado">Equilibrado</button><button type="button" data-p="masGiro">Más giro</button><button type="button" data-p="derrapador">Derrapador</button><button type="button" data-p="agarrado">Agarrado</button></div></div>
+  <label class="chk"><input id="cMarks" type="checkbox" checked> Huellas en el piso</label>
+  <div class="tbtns"><button type="button" id="bClear">Borrar huellas</button><button type="button" id="bDefaults">Valores por defecto</button></div>
+</div>
+
+<div id="toast"></div>
+<div id="hint"><b>W S</b> gas y freno · <b>A D</b> dirección · <b>Espacio</b> freno de mano · <b>R</b> volver a la largada · <b>C</b> cámara · <b>T</b> repetición</div>
+
+<div id="touch" hidden>
+  <div id="steerZone"><div id="steerBase" hidden></div><div id="steerKnob" hidden></div><div id="steerHelp">Deslizá acá para doblar</div></div>
+  <div id="pedals">
+    <button class="ped" id="bHand" type="button">MANO</button>
+    <button class="ped" id="bBrake" type="button">FRENO</button>
+    <div id="thr"><div id="thrFill"></div><div id="thrNeutral"></div><span class="thrLbl" style="top:12px">GAS</span><span class="thrLbl" style="bottom:12px">FRENO</span><div id="thrKnob">0</div></div>
+  </div>
+</div>
+
+<div id="intro">
+  <div class="card">
+    <h1>Ripio <span>RC</span></h1>
+    <p class="tag">Un auto de rally a escala 1:10, una cancha de ripio y un montón de conos. Prototipo para probar si manejarlo es divertido.</p>
+    <div class="stripe"></div>
+    <ul class="tests">
+      <li><span class="dot" style="background:var(--gate)"></span><span><b>Slalom.</b> Entrá entre los conos azules, zigzagueá los naranjas y salí por los azules del fondo. Cada cono volteado suma 2 s.</span></li>
+      <li><span class="dot" style="background:var(--hazard)"></span><span><b>Rampa.</b> En el lado izquierdo del circuito. Entrá con velocidad.</span></li>
+      <li><span class="dot" style="background:var(--cone)"></span><span><b>Trompos.</b> Girá alrededor del disco rojo y blanco sin tocarlo.</span></li>
+    </ul>
+    <div class="ctrls">
+      <div><h3>Teclado</h3><kbd>W</kbd> <kbd>S</kbd> gas y freno/atrás<br><kbd>A</kbd> <kbd>D</kbd> dirección<br><kbd>Espacio</kbd> freno de mano<br><kbd>R</kbd> largada · <kbd>C</kbd> cámara · <kbd>T</kbd> repetición</div>
+      <div><h3>Celular</h3>Deslizá el pulgar izquierdo para doblar. A la derecha: gas, freno y freno de mano. AUTO deja el gas puesto para manejar con un solo dedo.<br>También anda un joystick.</div>
+    </div>
+    <button id="play" type="button">JUGAR</button>
+  </div>
+</div>
+
+<script type="module" src="/src/main.ts"></script>
+</body></html>

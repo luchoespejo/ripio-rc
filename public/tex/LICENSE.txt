@@ -1,0 +1,5 @@
+Texturas y cielo: Poly Haven (CC0) - asphalt_02, gravel_road, grass_ground, kloofendal_48d_partly_cloudy_puresky
+
+trees/*.webp: sprites (fotografías con fondo transparente) generados a partir de los modelos 3D de Poly Haven
+(fir_sapling, pine_sapling_small, island_tree_01, tree_small_02), todos CC0. https://polyhaven.com/a/<id>
+Las imágenes las genera tools/impostor.html.
